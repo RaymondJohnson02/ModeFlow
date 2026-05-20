@@ -1,8 +1,20 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg-base: #0d0d0d;
+  --bg-panel: #141414;
+  --bg-elevated: #1a1a1a;
+  --bg-hover: #222222;
+  --bg-selected: #1e2430;
+  --border-subtle: #2a2a2a;
+  --text-primary: #e4e4e4;
+  --text-muted: #737373;
+  --text-dim: #525252;
+  --accent-explore: #d4a017;
+  --accent-build: #4a9eff;
+  --accent-test: #3dd68c;
+  --background: var(--bg-base);
+  --foreground: var(--text-primary);
 }
 
 @theme inline {
@@ -12,15 +24,54 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html,
+body {
+  height: 100%;
+  overflow: hidden;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+.font-mono-ui {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+.panel-border-r {
+  border-right: 1px solid var(--border-subtle);
+}
+
+.panel-border-l {
+  border-left: 1px solid var(--border-subtle);
+}
+
+.panel-border-t {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.accent-bar-explore {
+  border-left: 2px solid var(--accent-explore);
+}
+
+.accent-bar-build {
+  border-left: 2px solid var(--accent-build);
+}
+
+.accent-bar-test {
+  border-left: 2px solid var(--accent-test);
+}
+
+.text-accent-explore {
+  color: var(--accent-explore);
+}
+
+.text-accent-build {
+  color: var(--accent-build);
+}
+
+.text-accent-test {
+  color: var(--accent-test);
 }
