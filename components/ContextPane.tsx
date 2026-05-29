@@ -1,17 +1,18 @@
 "use client";
 
-import type { AppView, Item, Stage } from "@/lib/types";
-import { STAGES, STAGE_META } from "@/lib/types";
+import { getStage, sortedStages, type StageDefinition } from "@/lib/stages";
+import type { AppView, Item, StageId } from "@/lib/types";
 
 type ContextPaneProps = {
   view: AppView;
+  stages: StageDefinition[];
   item: Item | null;
-  restoreStage: Stage;
-  onRestoreStageChange: (stage: Stage) => void;
+  restoreStage: StageId;
+  onRestoreStageChange: (stage: StageId) => void;
   onUpdate: (id: string, patch: Partial<Item>) => void;
-  onRestore: (id: string, stage: Stage) => void;
+  onRestore: (id: string, stage: StageId) => void;
   onArchive: (id: string) => void;
-  onMove: (id: string, stage: Stage) => void;
+  onMove: (id: string, stage: StageId) => void;
 };
 
 function parseLines(text: string): string[] {
@@ -27,6 +28,7 @@ function linesToText(lines?: string[]): string {
 
 export function ContextPane({
   view,
+  stages,
   item,
   restoreStage,
   onRestoreStageChange,
@@ -35,6 +37,8 @@ export function ContextPane({
   onArchive,
   onMove,
 }: ContextPaneProps) {
+  const ordered = sortedStages(stages);
+
   if (!item) {
     return (
       <aside
@@ -48,17 +52,19 @@ export function ContextPane({
           CONTEXT
         </header>
         <p
-          className="px-4 py-8 font-mono-ui text-xs"
+          className="px-4 py-8 font-mono-ui text-xs leading-relaxed"
           style={{ color: "var(--text-dim)" }}
         >
-          — select an item
+          {view === "settings"
+            ? "— configure shortcuts and stages · Esc to leave"
+            : "— select an item"}
         </p>
       </aside>
     );
   }
 
   const isArchived = Boolean(item.archivedAt);
-  const meta = STAGE_META[item.stage];
+  const meta = getStage(stages, item.stage);
 
   function saveNotes(notes: string) {
     onUpdate(item!.id, { notes: notes.trim() || undefined });
@@ -67,26 +73,26 @@ export function ContextPane({
   function saveLinks(text: string) {
     const links = parseLines(text);
     onUpdate(item!.id, {
-      exploreLinks: links.length ? links : undefined,
+      links: links.length ? links : undefined,
     });
   }
 
   function saveChecklist(text: string) {
     const lines = parseLines(text);
-    const prev = item!.testChecklistChecked ?? [];
+    const prev = item!.checklistChecked ?? [];
     const checked = lines.map((_, i) => prev[i] ?? false);
     onUpdate(item!.id, {
-      testChecklist: lines.length ? lines : undefined,
-      testChecklistChecked: lines.length ? checked : undefined,
+      checklist: lines.length ? lines : undefined,
+      checklistChecked: lines.length ? checked : undefined,
     });
   }
 
   function toggleCheck(index: number) {
-    const list = item!.testChecklist ?? [];
-    const checked = [...(item!.testChecklistChecked ?? list.map(() => false))];
+    const list = item!.checklist ?? [];
+    const checked = [...(item!.checklistChecked ?? list.map(() => false))];
     while (checked.length < list.length) checked.push(false);
     checked[index] = !checked[index];
-    onUpdate(item!.id, { testChecklistChecked: checked });
+    onUpdate(item!.id, { checklistChecked: checked });
   }
 
   return (
@@ -99,31 +105,32 @@ export function ContextPane({
         style={{ borderBottom: "1px solid var(--border-subtle)" }}
       >
         <div className="font-mono-ui text-xs" style={{ color: "var(--text-primary)" }}>
-          <span className={meta.accentClass}>{meta.glyph}</span> {item.title}
+          <span style={{ color: meta?.color }}>{meta?.glyph ?? "?"}</span>{" "}
+          {item.title}
         </div>
         {!isArchived && (
           <div className="mt-2 flex flex-wrap gap-1 font-mono-ui text-[10px]">
-            {STAGES.filter((s) => s !== item.stage).map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => onMove(item.id, s)}
-                className="px-1.5 py-0.5 hover:bg-[var(--bg-hover)]"
-                style={{ color: "var(--text-muted)" }}
-              >
-                → {STAGE_META[s].label}
-              </button>
-            ))}
-            {item.stage === "test" && (
-              <button
-                type="button"
-                onClick={() => onArchive(item.id)}
-                className="px-1.5 py-0.5 hover:bg-[var(--bg-hover)]"
-                style={{ color: "var(--accent-test)" }}
-              >
-                archive
-              </button>
-            )}
+            {ordered
+              .filter((s) => s.id !== item.stage)
+              .map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => onMove(item.id, s.id)}
+                  className="px-1.5 py-0.5 hover:bg-[var(--bg-hover)]"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  → {s.label}
+                </button>
+              ))}
+            <button
+              type="button"
+              onClick={() => onArchive(item.id)}
+              className="px-1.5 py-0.5 hover:bg-[var(--bg-hover)]"
+              style={{ color: meta?.color ?? "var(--text-muted)" }}
+            >
+              archive
+            </button>
           </div>
         )}
       </header>
@@ -138,8 +145,8 @@ export function ContextPane({
         <textarea
           key={`notes-${item.id}-${item.updatedAt}`}
           defaultValue={item.notes ?? ""}
-          rows={6}
-          className="mb-4 w-full resize-y rounded-sm border bg-transparent px-2 py-1.5 text-xs outline-none focus:border-[var(--border-subtle)]"
+          rows={5}
+          className="mb-4 w-full resize-y rounded-sm border bg-transparent px-2 py-1.5 text-xs outline-none"
           style={{
             borderColor: "var(--border-subtle)",
             color: "var(--text-primary)",
@@ -148,86 +155,76 @@ export function ContextPane({
           onBlur={(e) => saveNotes(e.target.value)}
         />
 
-        {(item.stage === "explore" || item.exploreLinks?.length) && (
-          <>
-            <label
-              className="mb-1 block text-[10px] uppercase tracking-wider"
-              style={{ color: "var(--text-dim)" }}
-            >
-              links
-            </label>
-            <textarea
-              key={`links-${item.id}-${item.updatedAt}`}
-              defaultValue={linesToText(item.exploreLinks)}
-              rows={4}
-              placeholder="one url per line"
-              className="mb-4 w-full resize-y rounded-sm border bg-transparent px-2 py-1.5 text-xs outline-none"
-              style={{
-                borderColor: "var(--border-subtle)",
-                color: "var(--text-primary)",
-                background: "var(--bg-base)",
-              }}
-              onBlur={(e) => saveLinks(e.target.value)}
-            />
-          </>
-        )}
+        <label
+          className="mb-1 block text-[10px] uppercase tracking-wider"
+          style={{ color: "var(--text-dim)" }}
+        >
+          links
+        </label>
+        <textarea
+          key={`links-${item.id}-${item.updatedAt}`}
+          defaultValue={linesToText(item.links)}
+          rows={3}
+          placeholder="one url per line"
+          className="mb-4 w-full resize-y rounded-sm border bg-transparent px-2 py-1.5 text-xs outline-none"
+          style={{
+            borderColor: "var(--border-subtle)",
+            color: "var(--text-primary)",
+            background: "var(--bg-base)",
+          }}
+          onBlur={(e) => saveLinks(e.target.value)}
+        />
 
-        {(item.stage === "test" || item.testChecklist?.length) && (
-          <>
-            <label
-              className="mb-1 block text-[10px] uppercase tracking-wider"
-              style={{ color: "var(--text-dim)" }}
-            >
-              validation
-            </label>
-            {(item.testChecklist ?? []).length > 0 ? (
-              <ul className="mb-3 space-y-1">
-                {(item.testChecklist ?? []).map((line, i) => {
-                  const checked = item.testChecklistChecked?.[i] ?? false;
-                  return (
-                    <li key={i} className="flex items-start gap-2">
-                      <button
-                        type="button"
-                        onClick={() => toggleCheck(i)}
-                        className="shrink-0"
-                        style={{
-                          color: checked
-                            ? "var(--accent-test)"
-                            : "var(--text-dim)",
-                        }}
-                      >
-                        {checked ? "[x]" : "[ ]"}
-                      </button>
-                      <span
-                        style={{
-                          color: checked
-                            ? "var(--text-dim)"
-                            : "var(--text-primary)",
-                          textDecoration: checked ? "line-through" : undefined,
-                        }}
-                      >
-                        {line}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : null}
-            <textarea
-              key={`check-${item.id}-${item.updatedAt}`}
-              defaultValue={linesToText(item.testChecklist)}
-              rows={4}
-              placeholder="checklist items, one per line"
-              className="mb-4 w-full resize-y rounded-sm border bg-transparent px-2 py-1.5 text-xs outline-none"
-              style={{
-                borderColor: "var(--border-subtle)",
-                color: "var(--text-primary)",
-                background: "var(--bg-base)",
-              }}
-              onBlur={(e) => saveChecklist(e.target.value)}
-            />
-          </>
+        <label
+          className="mb-1 block text-[10px] uppercase tracking-wider"
+          style={{ color: "var(--text-dim)" }}
+        >
+          validation
+        </label>
+        {(item.checklist ?? []).length > 0 && (
+          <ul className="mb-3 space-y-1">
+            {(item.checklist ?? []).map((line, i) => {
+              const checked = item.checklistChecked?.[i] ?? false;
+              return (
+                <li key={i} className="flex items-start gap-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleCheck(i)}
+                    className="shrink-0"
+                    style={{
+                      color: checked
+                        ? meta?.color ?? "var(--text-dim)"
+                        : "var(--text-dim)",
+                    }}
+                  >
+                    {checked ? "[x]" : "[ ]"}
+                  </button>
+                  <span
+                    style={{
+                      color: checked ? "var(--text-dim)" : "var(--text-primary)",
+                      textDecoration: checked ? "line-through" : undefined,
+                    }}
+                  >
+                    {line}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
         )}
+        <textarea
+          key={`check-${item.id}-${item.updatedAt}`}
+          defaultValue={linesToText(item.checklist)}
+          rows={3}
+          placeholder="checklist items, one per line"
+          className="mb-4 w-full resize-y rounded-sm border bg-transparent px-2 py-1.5 text-xs outline-none"
+          style={{
+            borderColor: "var(--border-subtle)",
+            color: "var(--text-primary)",
+            background: "var(--bg-base)",
+          }}
+          onBlur={(e) => saveChecklist(e.target.value)}
+        />
 
         {isArchived && view === "archive" && (
           <div className="mt-4 space-y-2">
@@ -239,9 +236,7 @@ export function ContextPane({
             </label>
             <select
               value={restoreStage}
-              onChange={(e) =>
-                onRestoreStageChange(e.target.value as Stage)
-              }
+              onChange={(e) => onRestoreStageChange(e.target.value)}
               className="w-full rounded-sm border px-2 py-1 text-xs"
               style={{
                 borderColor: "var(--border-subtle)",
@@ -249,9 +244,9 @@ export function ContextPane({
                 color: "var(--text-primary)",
               }}
             >
-              {STAGES.map((s) => (
-                <option key={s} value={s}>
-                  {STAGE_META[s].label}
+              {ordered.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.label}
                 </option>
               ))}
             </select>
@@ -259,7 +254,7 @@ export function ContextPane({
               type="button"
               onClick={() => onRestore(item.id, restoreStage)}
               className="w-full rounded-sm py-1.5 text-xs hover:bg-[var(--bg-hover)]"
-              style={{ color: "var(--accent-test)" }}
+              style={{ color: meta?.color ?? "var(--text-primary)" }}
             >
               restore (r)
             </button>

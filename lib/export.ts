@@ -24,18 +24,39 @@ export type ImportResult =
   | { ok: true; items: Item[] }
   | { ok: false; error: string };
 
-function isValidItem(value: unknown): value is Item {
-  if (!value || typeof value !== "object") return false;
-  const item = value as Record<string, unknown>;
-  return (
-    typeof item.id === "string" &&
-    typeof item.title === "string" &&
-    (item.stage === "explore" ||
-      item.stage === "build" ||
-      item.stage === "test") &&
-    typeof item.createdAt === "string" &&
-    typeof item.updatedAt === "string"
-  );
+function migrateImportItem(value: unknown): Item | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  if (typeof raw.id !== "string" || typeof raw.title !== "string") return null;
+  if (typeof raw.stage !== "string") return null;
+  if (typeof raw.createdAt !== "string" || typeof raw.updatedAt !== "string")
+    return null;
+
+  const item: Item = {
+    id: raw.id,
+    title: raw.title,
+    stage: raw.stage,
+    createdAt: raw.createdAt,
+    updatedAt: raw.updatedAt,
+  };
+
+  if (typeof raw.notes === "string") item.notes = raw.notes;
+  const links =
+    (raw.links as string[] | undefined) ??
+    (raw.exploreLinks as string[] | undefined);
+  const checklist =
+    (raw.checklist as string[] | undefined) ??
+    (raw.testChecklist as string[] | undefined);
+  const checklistChecked =
+    (raw.checklistChecked as boolean[] | undefined) ??
+    (raw.testChecklistChecked as boolean[] | undefined);
+  if (Array.isArray(links) && links.length) item.links = links;
+  if (Array.isArray(checklist) && checklist.length) item.checklist = checklist;
+  if (Array.isArray(checklistChecked) && checklistChecked.length)
+    item.checklistChecked = checklistChecked;
+  if (typeof raw.archivedAt === "string") item.archivedAt = raw.archivedAt;
+
+  return item;
 }
 
 export function importFromJson(raw: string): ImportResult {
@@ -54,7 +75,9 @@ export function importFromJson(raw: string): ImportResult {
     if (!Array.isArray(record.items)) {
       return { ok: false, error: "Missing items array." };
     }
-    const items = record.items.filter(isValidItem);
+    const items = record.items
+      .map(migrateImportItem)
+      .filter((item): item is Item => item !== null);
     if (items.length !== record.items.length) {
       return { ok: false, error: "Some items failed validation." };
     }

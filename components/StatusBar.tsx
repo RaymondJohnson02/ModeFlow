@@ -1,26 +1,75 @@
 "use client";
 
+import { formatOpenSettingsBinding } from "@/lib/fixedShortcuts";
+import { formatBinding, type ShortcutMap } from "@/lib/shortcuts";
+import { getStage, sortedStages, type StageDefinition } from "@/lib/stages";
 import type { AppView } from "@/lib/types";
-import { STAGE_META } from "@/lib/types";
 
 type StatusBarProps = {
   message: string | null;
   showHelp: boolean;
   view: AppView;
+  shortcuts: ShortcutMap;
+  stages: StageDefinition[];
 };
 
-const HELP_LINES = [
-  "j/k ↑↓ navigate · n new · e edit · Shift+e move explore",
-  "b move build · Shift+b view build · t move test · Shift+t view test",
-  "1/2/3 switch view · Shift+1/2/3 move item · 4 archive view",
-  "a archive (test) · r restore · / search archive · Esc clear · ? help",
-];
+function stageViewHints(stages: StageDefinition[]): string {
+  return sortedStages(stages)
+    .slice(0, 4)
+    .map((s) => `${formatBinding(s.shortcuts.view)} ${s.label.toLowerCase()}`)
+    .join(" · ");
+}
 
-export function StatusBar({ message, showHelp, view }: StatusBarProps) {
+function buildHelpLine(shortcuts: ShortcutMap, stages: StageDefinition[]): string {
+  const parts = [
+    `${formatBinding(shortcuts.newItem)} new`,
+    `${formatBinding(shortcuts.editTitle)} edit`,
+    `${formatBinding(shortcuts.navigateDown)}/${formatBinding(shortcuts.navigateUp)} nav`,
+    stageViewHints(stages),
+    `${formatBinding(shortcuts.toggleHelp)} help`,
+    `${formatOpenSettingsBinding()} settings`,
+  ];
+  return parts.join(" · ");
+}
+
+function buildFullHelp(shortcuts: ShortcutMap, stages: StageDefinition[]): string {
+  const stageParts = sortedStages(stages).flatMap((s) => [
+    `${formatBinding(s.shortcuts.view)} view ${s.label}`,
+    `${formatBinding(s.shortcuts.moveTo)} move ${s.label}`,
+  ]);
+  const parts = [
+    `${formatBinding(shortcuts.navigateDown)}/${formatBinding(shortcuts.navigateUp)} ↑↓ navigate`,
+    `${formatBinding(shortcuts.newItem)} new`,
+    `${formatBinding(shortcuts.editTitle)} edit`,
+    `${formatBinding(shortcuts.deselect)} deselect`,
+    ...stageParts,
+    `${formatBinding(shortcuts.viewArchive)} archive view`,
+    `${formatBinding(shortcuts.archive)} archive item`,
+    `${formatBinding(shortcuts.restore)} restore`,
+    `${formatBinding(shortcuts.searchArchive)} search archive`,
+    `${formatBinding(shortcuts.clearSelection)} clear`,
+    `${formatBinding(shortcuts.toggleHelp)} help`,
+    `${formatOpenSettingsBinding()} settings`,
+  ];
+  return parts.join(" · ");
+}
+
+export function StatusBar({
+  message,
+  showHelp,
+  view,
+  shortcuts,
+  stages,
+}: StatusBarProps) {
   const viewLabel =
     view === "archive"
       ? "Archive"
-      : STAGE_META[view].label.toUpperCase();
+      : view === "settings"
+        ? "Settings"
+        : getStage(stages, view)?.label.toUpperCase() ?? view.toUpperCase();
+
+  const defaultHint = buildHelpLine(shortcuts, stages);
+  const fullHelp = buildFullHelp(shortcuts, stages);
 
   return (
     <footer
@@ -33,11 +82,9 @@ export function StatusBar({ message, showHelp, view }: StatusBarProps) {
           {message}
         </span>
       ) : showHelp ? (
-        <span className="truncate">{HELP_LINES.join(" · ")}</span>
+        <span className="truncate">{fullHelp}</span>
       ) : (
-        <span className="truncate opacity-70">
-          n new · e edit · j/k nav · 1/2/3 views · ? help
-        </span>
+        <span className="truncate opacity-70">{defaultHint}</span>
       )}
     </footer>
   );

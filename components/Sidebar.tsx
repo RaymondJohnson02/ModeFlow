@@ -1,29 +1,33 @@
 "use client";
 
-import type { AppView, Item, Stage } from "@/lib/types";
-import { STAGES, STAGE_META } from "@/lib/types";
+import { formatOpenSettingsBinding } from "@/lib/fixedShortcuts";
+import { sortedStages, type StageDefinition } from "@/lib/stages";
+import type { AppView, Item, StageId } from "@/lib/types";
 import { ExportImport } from "./ExportImport";
 
 type SidebarProps = {
   view: AppView;
+  stages: StageDefinition[];
   items: Item[];
   onViewChange: (view: AppView) => void;
   onImport: (items: Item[]) => void;
   onStatus: (msg: string) => void;
 };
 
-function countForStage(items: Item[], stage: Stage): number {
-  return items.filter((i) => !i.archivedAt && i.stage === stage).length;
+function countForStage(items: Item[], stageId: StageId): number {
+  return items.filter((i) => !i.archivedAt && i.stage === stageId).length;
 }
 
 export function Sidebar({
   view,
+  stages,
   items,
   onViewChange,
   onImport,
   onStatus,
 }: SidebarProps) {
   const archivedCount = items.filter((i) => i.archivedAt).length;
+  const ordered = sortedStages(stages);
 
   return (
     <aside
@@ -43,28 +47,25 @@ export function Sidebar({
       </div>
 
       <nav className="flex flex-1 flex-col gap-0.5 py-2">
-        {STAGES.map((stage) => {
-          const meta = STAGE_META[stage];
-          const active = view === stage;
-          const count = countForStage(items, stage);
+        {ordered.map((stage) => {
+          const active = view === stage.id;
+          const count = countForStage(items, stage.id);
           return (
             <button
-              key={stage}
+              key={stage.id}
               type="button"
-              onClick={() => onViewChange(stage)}
+              onClick={() => onViewChange(stage.id)}
               className="mx-1 flex items-center gap-2 px-2 py-1.5 text-left font-mono-ui text-xs hover:bg-[var(--bg-hover)]"
               style={{
                 background: active ? "var(--bg-elevated)" : undefined,
                 color: active ? "var(--text-primary)" : "var(--text-muted)",
               }}
             >
-              <span className={meta.accentClass} style={{ width: "1ch" }}>
+              <span style={{ width: "1ch", color: active ? stage.color : undefined }}>
                 {active ? ">" : " "}
               </span>
-              <span className={active ? meta.accentClass : undefined}>
-                {meta.glyph}
-              </span>
-              <span className="flex-1">{meta.label}</span>
+              <span style={{ color: stage.color }}>{stage.glyph}</span>
+              <span className="flex-1 truncate">{stage.label}</span>
               <span style={{ color: "var(--text-dim)" }}>{count}</span>
             </button>
           );
@@ -91,6 +92,26 @@ export function Sidebar({
           <span style={{ color: "var(--text-dim)" }}>#</span>
           <span className="flex-1">Archive</span>
           <span style={{ color: "var(--text-dim)" }}>{archivedCount}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onViewChange("settings")}
+          className="mx-1 flex items-center gap-2 px-2 py-1.5 text-left font-mono-ui text-xs hover:bg-[var(--bg-hover)]"
+          style={{
+            background: view === "settings" ? "var(--bg-elevated)" : undefined,
+            color:
+              view === "settings"
+                ? "var(--text-primary)"
+                : "var(--text-muted)",
+          }}
+        >
+          <span style={{ width: "1ch" }}>{view === "settings" ? ">" : " "}</span>
+          <span style={{ color: "var(--text-dim)" }}>*</span>
+          <span className="flex-1">Settings</span>
+          <span className="text-[10px]" style={{ color: "var(--text-dim)" }}>
+            {formatOpenSettingsBinding()}
+          </span>
         </button>
       </nav>
 

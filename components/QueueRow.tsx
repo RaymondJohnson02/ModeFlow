@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import type { StageDefinition } from "@/lib/stages";
 import type { Item } from "@/lib/types";
-import { STAGE_META } from "@/lib/types";
 
 type QueueRowProps = {
   item: Item;
+  stage: StageDefinition;
   selected: boolean;
   editing: boolean;
   onSelect: () => void;
@@ -16,6 +17,7 @@ type QueueRowProps = {
 
 export function QueueRow({
   item,
+  stage,
   selected,
   editing,
   onSelect,
@@ -24,7 +26,7 @@ export function QueueRow({
   onCancelEdit,
 }: QueueRowProps) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const meta = STAGE_META[item.stage];
+  const itemStage = stage;
 
   useEffect(() => {
     if (editing) inputRef.current?.focus();
@@ -35,6 +37,8 @@ export function QueueRow({
     if (trimmed) onSaveTitle(trimmed);
     else onCancelEdit();
   }
+
+  const rowStage = itemStage;
 
   return (
     <div
@@ -48,19 +52,15 @@ export function QueueRow({
       onKeyDown={(e) => {
         if (e.key === "Enter" && !editing) onSelect();
       }}
-      className={`font-mono-ui flex cursor-default items-start gap-2 px-3 py-1 text-xs leading-relaxed ${
-        selected ? meta.accentBarClass : ""
-      }`}
+      className="font-mono-ui flex cursor-default items-start gap-2 px-3 py-1 text-xs leading-relaxed"
       style={{
         background: selected ? "var(--bg-selected)" : undefined,
         color: selected ? "var(--text-primary)" : "var(--text-muted)",
+        borderLeft: selected ? `2px solid ${rowStage.color}` : "2px solid transparent",
       }}
     >
-      <span
-        className={`shrink-0 ${meta.accentClass}`}
-        style={{ width: "1ch" }}
-      >
-        {meta.glyph}
+      <span className="shrink-0" style={{ color: rowStage.color, width: "1ch" }}>
+        {rowStage.glyph}
       </span>
       {editing ? (
         <input

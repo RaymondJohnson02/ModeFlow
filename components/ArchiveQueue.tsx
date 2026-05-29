@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { getStage, type StageDefinition } from "@/lib/stages";
 import type { Item } from "@/lib/types";
-import { STAGE_META } from "@/lib/types";
 
 type ArchiveQueueProps = {
   items: Item[];
+  stages: StageDefinition[];
   query: string;
   selectedId: string | null;
   searchRef: React.RefObject<HTMLInputElement | null>;
@@ -15,6 +16,7 @@ type ArchiveQueueProps = {
 
 export function ArchiveQueue({
   items,
+  stages,
   query,
   selectedId,
   searchRef,
@@ -83,7 +85,7 @@ export function ArchiveQueue({
         )}
         {sorted.map((item) => {
           const selected = selectedId === item.id;
-          const meta = STAGE_META[item.stage];
+          const meta = getStage(stages, item.stage);
           return (
             <div
               key={item.id}
@@ -102,7 +104,7 @@ export function ArchiveQueue({
                 className="shrink-0 text-[10px]"
                 style={{ color: "var(--text-dim)" }}
               >
-                {meta.glyph}{" "}
+                {meta?.glyph ?? "?"}{" "}
                 {item.archivedAt
                   ? new Date(item.archivedAt).toLocaleDateString()
                   : ""}
